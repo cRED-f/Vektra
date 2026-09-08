@@ -1,0 +1,289 @@
+@import "tailwindcss";
+
+/* ------------------------------------------------------------------ */
+/*  Vektra design tokens — from DESIGN.md (Firecrawl / Refero style)   */
+/*  Tailwind v4 @theme emits these as CSS custom properties on :root   */
+/*  AND generates utility classes (bg-ember-orange, text-ink, ...)     */
+/* ------------------------------------------------------------------ */
+
+@theme {
+  /* ---- Colors ---- */
+  --color-ember-orange: #ff4d00;
+  --color-ember-glow-light: #fcddcc;
+  --color-ember-wash-deep: #febec2;
+  --color-gridline: #e5e7eb;
+  --color-ink: #262626;
+  --color-vellum: #f9f9f9;
+  --color-canvas: #ffffff;
+  --color-slate: #727272;
+  --color-graphite: #616161;
+  --color-ash: #949494;
+  --color-stone: #c7c7c7;
+  --color-mist: #b5b5b5;
+  --color-pebble: #838383;
+
+  /* ---- Type scale (14px body; display runs to 60px) ---- */
+  --text-caption: 10px;
+  --text-caption--line-height: 1.5;
+  --text-caption--letter-spacing: 0.2px;
+
+  --text-body: 14px;
+  --text-body--line-height: 1.5;
+
+  --text-heading-sm: 20px;
+  --text-heading-sm--line-height: 1.33;
+
+  --text-heading: 24px;
+  --text-heading--line-height: 1.2;
+
+  --text-heading-lg: 40px;
+  --text-heading-lg--line-height: 1.1;
+  --text-heading-lg--letter-spacing: -0.2px;
+
+  --text-display: 52px;
+  --text-display--line-height: 1.07;
+  --text-display--letter-spacing: -0.26px;
+
+  --text-display-xl: 60px;
+  --text-display-xl--line-height: 1;
+  --text-display-xl--letter-spacing: -0.6px;
+
+  /* ---- Border radius (named by element role) ---- */
+  --radius-tags: 999px;
+  --radius-cards: 16px;
+  --radius-icons: 999px;
+  --radius-inputs: 8px;
+  --radius-buttons: 999px;
+  --radius-code-windows: 8px;
+
+  /* ---- Shadow stacks (2-3% black alpha; ambient rings) ---- */
+  --shadow-subtle: rgb(249, 249, 249) 0px 0px 0px 6px;
+  --shadow-xl:
+    rgba(0, 0, 0, 0.02) 0px 40px 48px -20px,
+    rgba(0, 0, 0, 0.03) 0px 32px 32px -20px,
+    rgba(0, 0, 0, 0.03) 0px 16px 24px -12px,
+    rgba(0, 0, 0, 0.03) 0px 0px 0px 1px;
+  --shadow-xl-2:
+    rgba(0, 0, 0, 0.03) 0px 24px 32px -12px,
+    rgba(0, 0, 0, 0.03) 0px 16px 24px -8px,
+    rgba(0, 0, 0, 0.03) 0px 8px 16px -4px,
+    rgba(0, 0, 0, 0.03) 0px 0px 0px 1px;
+  --shadow-subtle-2: color(display-p3 0.984314 0.984314 0.984314) 0px 0px 0px 8px;
+  --shadow-subtle-3: rgb(253, 253, 253) 0px 0px 0px 8px;
+}
+
+/* Fonts map to next/font runtime variables (--font-suisse / --font-geist-mono) */
+@theme inline {
+  --font-sans: var(--font-suisse, "Inter", ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, sans-serif);
+  --font-mono: var(--font-geist-mono, ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace);
+}
+
+/* ---- Raw CSS custom properties for direct use / layout constants ---- */
+:root {
+  /* Type scale raw names (per DESIGN.md) */
+  --leading-caption: 1.5;
+  --tracking-caption: 0.2px;
+  --leading-body: 1.5;
+  --leading-heading-sm: 1.33;
+  --leading-heading: 1.2;
+  --leading-heading-lg: 1.1;
+  --tracking-heading-lg: -0.2px;
+  --leading-display: 1.07;
+  --tracking-display: -0.26px;
+  --leading-display-xl: 1;
+  --tracking-display-xl: -0.6px;
+
+  /* Spacing (4px base unit) */
+  --spacing-unit: 4px;
+
+  /* Layout */
+  --page-max-width: 1200px;
+  --section-gap: 96px;
+  --card-padding: 24px;
+  --element-gap: 12px;
+
+  /* Surfaces */
+  --surface-canvas: #ffffff;
+  --surface-vellum: #f9f9f9;
+  --surface-gridline: #e5e7eb;
+  --surface-shadow-tint: #fcddcc;
+}
+
+/* ---- Base layer ---- */
+@layer base {
+  body {
+    @apply bg-canvas font-sans text-ink antialiased;
+  }
+
+  ::selection {
+    background: var(--color-ember-glow-light);
+    color: var(--color-ink);
+  }
+}
+
+/* ---- Custom utilities ---- */
+@utility bg-grid {
+  background-image:
+    linear-gradient(to right, color-mix(in srgb, var(--color-gridline) 70%, transparent) 1px, transparent 1px),
+    linear-gradient(to bottom, color-mix(in srgb, var(--color-gridline) 70%, transparent) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* ------------------------------------------------------------------ */
+/*  Animations — entrance, scroll-reveal, hover, ambient               */
+/* ------------------------------------------------------------------ */
+
+/* --- Keyframes --- */
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(24px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to   { opacity: 1; }
+}
+
+@keyframes slide-in-left {
+  from { opacity: 0; transform: translateX(-24px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes scale-in {
+  from { opacity: 0; transform: scale(0.92); }
+  to   { opacity: 1; transform: scale(1); }
+}
+
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: 0.5; transform: scale(1.6); }
+}
+
+@keyframes typewriter-cursor {
+  0%, 100% { opacity: 1; }
+  50%      { opacity: 0; }
+}
+
+@keyframes shimmer {
+  from { background-position: 200% 0; }
+  to   { background-position: -200% 0; }
+}
+
+@keyframes float {
+  0%, 100% { transform: translateY(0); }
+  50%      { transform: translateY(-6px); }
+}
+
+@keyframes gradient-shift {
+  0%   { background-position: 0% 50%; }
+  50%  { background-position: 100% 50%; }
+  100% { background-position: 0% 50%; }
+}
+
+/* --- Entrance animation utilities (applied once on mount) --- */
+@utility animate-fade-in-up {
+  animation: fade-in-up 0.7s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@utility animate-fade-in {
+  animation: fade-in 0.6s ease-out both;
+}
+
+@utility animate-slide-in-left {
+  animation: slide-in-left 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+@utility animate-scale-in {
+  animation: scale-in 0.6s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+
+/* --- Scroll-reveal ---
+   SAFETY: Text is always visible by default (no opacity:0 on the utility).
+   The JS-ready approach hides elements ONLY when a small inline script has
+   added .js-ready to <body>. This means text is always visible if JS fails. */
+@utility reveal {
+  transform: translateY(24px);
+  transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@utility reveal-left {
+  transform: translateX(-24px);
+  transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@utility reveal-scale {
+  transform: scale(0.92);
+  transition: opacity 0.7s cubic-bezier(0.16, 1, 0.3, 1),
+              transform 0.7s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+/* Only hide reveal elements when JS is ready (body has .js-ready) */
+.js-ready .reveal,
+.js-ready .reveal-left,
+.js-ready .reveal-scale {
+  opacity: 0;
+}
+
+/* When Intersection Observer adds .revealed class */
+.revealed {
+  opacity: 1 !important;
+  transform: translateY(0) translateX(0) scale(1) !important;
+}
+
+/* --- Stagger delay helpers (inline style --stagger: N works too) --- */
+@utility stagger-1 { transition-delay: 0ms; }
+@utility stagger-2 { transition-delay: 80ms; }
+@utility stagger-3 { transition-delay: 160ms; }
+@utility stagger-4 { transition-delay: 240ms; }
+@utility stagger-5 { transition-delay: 320ms; }
+
+/* --- Hover lift for cards --- */
+@utility hover-lift {
+  transition: transform 0.3s cubic-bezier(0.16, 1, 0.3, 1),
+              box-shadow 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  &:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 12px 24px -8px rgba(0, 0, 0, 0.06),
+                0 0px 0px 1px rgba(0, 0, 0, 0.02);
+  }
+}
+
+/* --- Focus ring glow for inputs --- */
+@utility focus-glow {
+  transition: box-shadow 0.3s ease, border-color 0.3s ease;
+  &:focus-within {
+    box-shadow: 0 0 0 3px rgba(255, 77, 0, 0.12);
+    border-color: var(--color-ember-orange);
+  }
+}
+
+/* --- Ambient pulse for status dot --- */
+@utility animate-pulse-dot {
+  animation: pulse-dot 2s ease-in-out infinite;
+}
+
+/* --- Typing cursor blink --- */
+@utility animate-cursor {
+  animation: typewriter-cursor 1s step-end infinite;
+}
+
+/* --- Gradient text shimmer --- */
+@utility animate-shimmer {
+  background-size: 200% 100%;
+  animation: shimmer 3s linear infinite;
+}
+
+/* --- Subtle float --- */
+@utility animate-float {
+  animation: float 3s ease-in-out infinite;
+}
+
+/* --- Button press effect --- */
+@utility active-scale {
+  transition: transform 0.15s ease;
+  &:active {
+    transform: scale(0.97);
+  }
+}
