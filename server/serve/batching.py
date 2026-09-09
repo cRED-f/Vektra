@@ -60,8 +60,8 @@ class DynamicBatcher:
                 self._queues[key] = []
             self._queues[key].append(request)
 
-            queue_depth = sum(len(q) for q in self._queues.values())
-            queue_depth_gauge.set(queue_depth)
+            depth = sum(len(q) for q in self._queues.values())
+            queue_depth.set(depth)
 
             # Start flush timer if not running
             if self._flush_task is None or self._flush_task.done():
