@@ -6,7 +6,7 @@ Metric names are defined here once so dashboards stay stable.
 
 from __future__ import annotations
 
-from prometheus_client import Counter, Histogram, Info
+from prometheus_client import Counter, Gauge, Histogram, Info
 
 # ── Info ──────────────────────────────────────────────────────────────
 
@@ -71,10 +71,9 @@ batch_size = Histogram(
     buckets=[1, 2, 4, 8, 16, 32],
 )
 
-queue_depth = Histogram(
+queue_depth = Gauge(
     "vektra_queue_depth",
     "Request queue depth at batching",
-    buckets=[0, 1, 2, 4, 8, 16, 32],
 )
 
 # ── Gateway ───────────────────────────────────────────────────────────

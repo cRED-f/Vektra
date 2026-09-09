@@ -78,6 +78,7 @@ class RetrievalQuery(BaseModel):
     top_k: int = Field(default=5, ge=1, le=50)
     use_reranker: bool = True
     use_rewrite: bool = False
+    use_multi_hop: bool = False
 
 
 class RetrievalResult(BaseModel):
@@ -117,7 +118,7 @@ class ChatDelta(BaseModel):
 class ChatResponse(BaseModel):
     """Non-streaming chat response."""
 
-    answer: str
+    response: str
     sources: list[RetrievalResult] = Field(default_factory=list)
     model: str = ""
     tokens_used: int = 0
@@ -133,22 +134,20 @@ class BenchmarkRequest(BaseModel):
     prompt: str = "Explain what retrieval-augmented generation is."
     model: str | None = None
     max_tokens: int = 256
-    num_iterations: int = 5
+    num_runs: int = 5
 
 
 class BenchmarkResult(BaseModel):
     """Latency / throughput measurements for a model."""
 
     model: str
-    ttft_ms: float = Field(description="Time to first token (ms)")
-    tpot_ms: float = Field(description="Time per output token (ms)")
+    prompt: str = ""
+    avg_ttft_ms: float = Field(default=0.0, description="Time to first token (ms)")
+    avg_tpot_ms: float = Field(default=0.0, description="Time per output token (ms)")
     tokens_per_sec: float = 0.0
     total_tokens: int = 0
-    latency_p50_ms: float = 0.0
-    latency_p95_ms: float = 0.0
-    latency_p99_ms: float = 0.0
-    iterations: int = 0
-    errors: int = 0
+    num_runs: int = 0
+    max_tokens: int = 256
 
 
 # ── Model Registry ───────────────────────────────────────────────────
@@ -157,15 +156,17 @@ class BenchmarkResult(BaseModel):
 class ModelInfo(BaseModel):
     """Registered model metadata."""
 
-    id: str
+    model_id: str
     name: str
     family: str = ""
-    params: str = ""
+    params_count: int | None = None
     quantization: str = ""
-    vram_mb: int = 0
-    status: ModelStatus = ModelStatus.UNLOADED
-    latency_profile: dict = Field(default_factory=dict)
-    created_at: datetime = Field(default_factory=datetime.utcnow)
+    vram_mb: int | None = None
+    status: str = "registered"
+    current_version: str | None = None
+    avg_ttft_ms: float | None = None
+    avg_tpot_ms: float | None = None
+    tokens_per_sec: float | None = None
 
 
 class ModelLoad(BaseModel):
@@ -181,8 +182,8 @@ class ModelLoad(BaseModel):
 class HealthResponse(BaseModel):
     """Gateway health check."""
 
-    status: str = "ok"
+    status: str = "healthy"
     version: str = "0.1.0"
-    database: str = "ok"
-    ollama: str = "ok"
+    ollama_reachable: bool = True
+    database: str = "connected"
     uptime_seconds: float = 0.0

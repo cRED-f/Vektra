@@ -36,8 +36,8 @@ class Settings(BaseSettings):
     # ── Serving ───────────────────────────────────────────────────────
     serving_backend: str = "ollama"  # "ollama" | "vllm"
     vllm_host: str = "http://localhost:8080"
-    max_batch_size: int = 8
-    max_batch_wait_ms: int = 100
+    batch_max_size: int = 8
+    batch_max_wait_ms: float = 50.0
 
     # ── Retrieval ─────────────────────────────────────────────────────
     retrieval_top_k: int = 20
@@ -58,6 +58,10 @@ class Settings(BaseSettings):
 
     # ── Frontend (for CORS / proxy) ───────────────────────────────────
     frontend_url: str = "http://localhost:3000"
+    cors_origins: list[str] = ["http://localhost:3000"]
+
+    # ── Debug ──────────────────────────────────────────────────────────
+    debug: bool = False
 
 
 @lru_cache(maxsize=1)

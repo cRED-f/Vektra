@@ -49,20 +49,6 @@ class ChunkRow(Base):
     created_at = Column(DateTime, server_default=func.now())
 
 
-class ModelRow(Base):
-    __tablename__ = "models"
-
-    id = Column(String, primary_key=True)
-    name = Column(String, nullable=False, unique=True)
-    family = Column(String, default="")
-    params = Column(String, default="")
-    quantization = Column(String, default="")
-    vram_mb = Column(Integer, default=0)
-    status = Column(String, default="unloaded")
-    latency_profile = Column(Text, default="{}")
-    created_at = Column(DateTime, server_default=func.now())
-
-
 # ── Engine / Session ─────────────────────────────────────────────────
 
 
@@ -102,7 +88,13 @@ async def get_session() -> AsyncSession:  # type: ignore[misc]
 
 
 async def init_db():
-    """Create all tables (dev convenience — use Alembic in prod)."""
+    """Create all tables (dev convenience — use Alembic in prod).
+
+    Imports registry models explicitly so their tables register on
+    Base.metadata before create_all runs.
+    """
+    import server.registry.models  # noqa: F401  (register tables)
+
     engine = get_engine()
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
