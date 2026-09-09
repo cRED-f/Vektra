@@ -1,0 +1,15 @@
+# ── Grafana datasource provisioning ───────────────────────────────────
+# Grafana supports "provisioning": config-as-code that sets up datasources,
+# dashboards, and users without clicking through the UI.
+# `apiVersion: 1` = the provisioning API format version. Always 1.
+
+apiVersion: 1
+
+datasources:
+  - name: Prometheus
+    type: prometheus          # the datasource plugin type
+    access: proxy            # Grafana fetches via its own server, not the browser
+    # "prometheus" = the docker-compose service name, resolved on the compose network.
+    url: http://prometheus:9090
+    isDefault: true          # Grafana uses this by default for new panels
+    editable: false

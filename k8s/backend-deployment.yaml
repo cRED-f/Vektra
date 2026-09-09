@@ -1,0 +1,57 @@
+# ── Deployment: the "running app" recipe ─────────────────────────────
+# A Deployment is the k8s way of saying: "keep THIS container image running,
+# and give me exactly `replicas` copies of it, always."
+
+apiVersion: apps/v1         # which group of k8s API this object belongs to
+kind: Deployment
+metadata:
+  name: vektra-backend
+  labels:
+    app: vektra-backend
+
+spec:
+  replicas: 2               # run 2 copies → if one dies, the other still serves
+  selector:
+    matchLabels:            # k8s uses labels to find "which pods belong to me"
+      app: vektra-backend
+  template:
+    metadata:
+      labels:
+        app: vektra-backend # Pods carry this label so the Deployment can manage them
+    spec:
+      containers:
+        - name: backend
+          # The image we build with `docker compose build`.
+          # In real cloud you'd push this to a registry; locally kind reuses it.
+          image: project1-backend:latest
+          imagePullPolicy: IfNotPresent   # don't try to pull from the internet
+          ports:
+            - containerPort: 8000
+          env:
+            # Same config as docker-compose — the database is a Service now,
+            # reachable by DNS name "vektra-db" inside the cluster.
+            - name: VEKTRA_DATABASE_URL
+              value: postgresql+asyncpg://vektra:vektra@vektra-db:5432/vektra
+            - name: VEKTRA_OLLAMA_HOST
+              value: http://host.docker.internal:11434
+            - name: VEKTRA_CORS_ORIGINS
+              value: '["http://localhost:3000"]'
+          # TWO probes, because they answer different questions:
+          #   liveness  : "is the process hung?" → /health/live, instant, no deps.
+          #               Must NEVER depend on Ollama/DB, or a slow dependency
+          #               would restart a perfectly healthy process.
+          #   readiness : "can it take my traffic?" → /health/ready pings
+          #               DB + Ollama and returns 503 when degraded, so k8s
+          #               stops sending traffic — the honest behavior.
+          livenessProbe:
+            httpGet:
+              path: /health/live
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+          readinessProbe:
+            httpGet:
+              path: /health/ready
+              port: 8000
+            initialDelaySeconds: 10
+            periodSeconds: 10

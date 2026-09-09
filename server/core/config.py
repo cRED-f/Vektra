@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     # ── Database ──────────────────────────────────────────────────────
     database_url: str = "postgresql+asyncpg://vektra:vektra@localhost:5432/vektra"
     database_echo: bool = False
+    # Dev convenience — create tables on startup. Use Alembic/migrations in prod.
+    auto_create_tables: bool = True
 
     # ── Ollama ────────────────────────────────────────────────────────
     ollama_host: str = "http://localhost:11434"

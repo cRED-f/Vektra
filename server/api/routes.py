@@ -2,9 +2,14 @@
 
 from __future__ import annotations
 
+import asyncio
+
 from fastapi import APIRouter, Depends, HTTPException, Request
-from fastapi.responses import StreamingResponse
+from fastapi.responses import JSONResponse, Response, StreamingResponse
 from prometheus_client import generate_latest
+from sqlalchemy import text
+
+from server.core.db import get_engine
 
 from server.api.auth import verify_token
 from server.api.circuit_breaker import get_circuit_breaker
@@ -61,18 +66,65 @@ def _check_rate_limit(request: Request):
 
 # ── Routes ─────────────────────────────────────────────────────────────
 
-@router.get("/health")
-async def health() -> HealthResponse:
-    """Health check endpoint."""
+# ── Health ────────────────────────────────────────────────────────────
+# TWO separate checks, because they answer different questions:
+#   /health/live  — "is the process alive?"  → instant, NO network calls.
+#                   k8s livenessProbe uses this. If it fails the pod restarts.
+#   /health/ready — "can it serve traffic?"  → pings DB + Ollama for real.
+#                   k8s readinessProbe uses this. 503 = not ready, no traffic.
+#   /health       — alias of /health/ready, kept so anything that only reads
+#                   the HTTP status code never gets a FAKE 200 when degraded.
+
+async def _ping_database() -> bool:
+    """Real DB check: run `SELECT 1` with a hard 3s timeout."""
+    try:
+
+        async def _ping() -> None:
+            async with get_engine().connect() as conn:
+                await conn.execute(text("SELECT 1"))
+
+        await asyncio.wait_for(_ping(), timeout=3.0)
+        return True
+    except Exception:
+        return False
+
+
+async def _readiness() -> JSONResponse:
+    """Probe dependencies and return an HONEST status code."""
     server = get_model_server()
     ollama_ok = await server.health_check()
-
-    return HealthResponse(
-        status="healthy" if ollama_ok else "degraded",
+    database_ok = await _ping_database()
+    healthy = ollama_ok and database_ok
+    payload = HealthResponse(
+        status="healthy" if healthy else "degraded",
         version="0.1.0",
         ollama_reachable=ollama_ok,
-        database="connected",  # TODO: actual DB ping
+        database="connected" if database_ok else "unreachable",
     )
+    # Degraded → 503, NOT 200. Monitoring that watches status codes only
+    # (load balancers, k8s probes, uptime checks) now sees the truth.
+    return JSONResponse(
+        status_code=200 if healthy else 503,
+        content=payload.model_dump(),
+    )
+
+
+@router.get("/health/live")
+async def health_live():
+    """Liveness — the process is up. Touches nothing; answers instantly."""
+    return {"status": "ok"}
+
+
+@router.get("/health/ready")
+async def health_ready():
+    """Readiness — real dependency checks. 200 healthy / 503 degraded."""
+    return await _readiness()
+
+
+@router.get("/health")
+async def health():
+    """Alias for /health/ready (kept for compatibility; honestly coded)."""
+    return await _readiness()
 
 
 @router.post("/retrieve", dependencies=[Depends(verify_token)])
@@ -222,9 +274,13 @@ async def list_models(_token: str = Depends(verify_token)):
 
 
 @router.get("/metrics")
-async def metrics():
-    """Prometheus metrics endpoint."""
-    return StreamingResponse(
-        generate_latest(),
-        media_type="text/plain",
+def metrics():
+    """Prometheus metrics endpoint.
+
+    generate_latest() returns BYTES (not str). Response accepts bytes directly;
+    StreamingResponse would iterate bytes one int at a time and crash.
+    """
+    return Response(
+        content=generate_latest(),
+        media_type="text/plain; version=0.0.4",
     )

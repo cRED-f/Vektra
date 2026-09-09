@@ -46,9 +46,12 @@ class ModelServer:
         model = model or self._settings.ollama_generation_model
 
         if stream:
-            return await self._generate_stream(prompt, model=model,
-                                              temperature=temperature,
-                                              max_tokens=max_tokens)
+            # _generate_stream is an async generator (it yields). You do NOT
+            # await one — calling it returns the generator object, which the
+            # caller iterates with `async for`.
+            return self._generate_stream(prompt, model=model,
+                                         temperature=temperature,
+                                         max_tokens=max_tokens)
 
         start = time.monotonic()
 

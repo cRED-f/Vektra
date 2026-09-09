@@ -1,0 +1,51 @@
+# ── Frontend Deployment + Service ────────────────────────────────────
+# Same two concepts as the backend: a Deployment keeps pods alive,
+# a Service gives them a stable address.
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vektra-frontend
+  labels:
+    app: vektra-frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vektra-frontend
+  template:
+    metadata:
+      labels:
+        app: vektra-frontend
+    spec:
+      containers:
+        - name: frontend
+          image: project1-frontend:latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - containerPort: 3000
+          env:
+            - name: HOSTNAME
+              value: "0.0.0.0"
+            - name: PORT
+              value: "3000"
+          livenessProbe:
+            httpGet:
+              path: /
+              port: 3000
+            initialDelaySeconds: 10
+            periodSeconds: 10
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vektra-frontend
+  labels:
+    app: vektra-frontend
+spec:
+  selector:
+    app: vektra-frontend
+  ports:
+    - port: 3000
+      targetPort: 3000
+  type: ClusterIP

@@ -59,3 +59,4 @@ dist/
 
 # docker
 docker-compose.override.yml
+loadtest-report.json

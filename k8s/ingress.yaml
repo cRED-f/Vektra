@@ -1,0 +1,32 @@
+# ── Ingress: the public front door ────────────────────────────────────
+# A Service is reachable only INSIDE the cluster. An Ingress is a controller
+# (running separately) that routes traffic from OUTSIDE into the right Service,
+# by hostname or URL path.
+#
+# In our kind cluster we won't install the ingress controller — for local
+# access we use `kubectl port-forward` instead. This file documents the
+# production shape: put it behind a real ingress/load-balancer in the cloud.
+
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: vektra-ingress
+spec:
+  rules:
+    - host: vektra.local        # the hostname this ingress answers to (your DNS)
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: vektra-frontend
+                port:
+                  number: 3000
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: vektra-backend
+                port:
+                  number: 8000

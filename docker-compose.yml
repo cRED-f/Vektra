@@ -1,0 +1,113 @@
+# ── docker-compose.yml — run the whole Vektra stack with one command ──
+# Docker Compose: a tool that starts MULTIPLE containers together and lets
+# them talk to each other. Each block under `services:` is one container.
+
+# `version:` is obsolete in modern Compose — omit it.
+
+services:
+  # ── 1. Database ─────────────────────────────────────────────────────
+  db:
+    # `image:` pulls a PRE-BUILT image from a registry (no Dockerfile needed).
+    # pgvector/pgvector ships Postgres WITH the vector extension compiled in.
+    image: pgvector/pgvector:pg16
+    container_name: vektra-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: vektra
+      POSTGRES_PASSWORD: vektra
+      POSTGRES_DB: vektra
+    ports:
+      # host:container — host port 5432 forwards to the container's 5432.
+      # Lets you connect from your machine with a normal Postgres client.
+      - "5432:5432"
+    volumes:
+      # A named volume survives container restarts — data is NOT lost.
+      - pgdata:/var/lib/postgresql/data
+      # Run any .sql file in this folder on first boot (enables pgvector).
+      - ./docker/db-init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      # Postgres has no healthcheck built in; pg_isready probes it.
+      test: ["CMD-SHELL", "pg_isready -U vektra -d vektra"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # ── 2. Backend API ──────────────────────────────────────────────────
+  backend:
+    # `build:` builds a NEW image from our Dockerfile in docker/.
+    build:
+      context: .          # build context = repo root (.dockerignore applies)
+      dockerfile: docker/backend.Dockerfile
+    container_name: vektra-backend
+    restart: unless-stopped
+    environment:
+      # ⭐ KEY CONCEPT: inside a compose network, the DATABASE is reachable
+      # by its service name "db", NOT "localhost". localhost would be this
+      # container itself.
+      VEKTRA_DATABASE_URL: postgresql+asyncpg://vektra:vektra@db:5432/vektra
+      # Ollama runs on YOUR machine, not in a container. Docker's magic
+      # hostname "host.docker.internal" reaches the host from a container.
+      VEKTRA_OLLAMA_HOST: http://host.docker.internal:11434
+      # pydantic-settings parses list fields as JSON.
+      VEKTRA_CORS_ORIGINS: '["http://localhost:3000"]'
+    ports:
+      - "8000:8000"
+    depends_on:
+      # Start db first, and wait until its healthcheck passes.
+      db:
+        condition: service_healthy
+
+  # ── 3. Frontend web app ─────────────────────────────────────────────
+  frontend:
+    build:
+      context: .
+      dockerfile: docker/frontend.Dockerfile
+    container_name: vektra-frontend
+    restart: unless-stopped
+    environment:
+      HOSTNAME: 0.0.0.0
+      PORT: 3000
+    ports:
+      - "3000:3000"
+    depends_on:
+      - backend
+
+  # ── 4. Prometheus (metrics scraper) ─────────────────────────────────
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: vektra-prometheus
+    restart: unless-stopped
+    ports:
+      # Prometheus's own debug UI. The dashboards live in Grafana instead.
+      # Host port is 9091 because 9090 is already taken on this machine.
+      # Internal port stays 9090 (how other containers reach it).
+      - "9091:9090"
+    volumes:
+      # Bind-mount our config file IN (read-only). ":" separates host:container.
+      # Changes on your disk take effect after `docker compose restart prometheus`.
+      - ./infra/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+
+  # ── 5. Grafana (dashboards) ─────────────────────────────────────────
+  grafana:
+    image: grafana/grafana:latest
+    container_name: vektra-grafana
+    restart: unless-stopped
+    ports:
+      # 3001 on the host because 3000 is already the frontend.
+      - "3001:3000"
+    environment:
+      # Default admin login; change these for anything real.
+      GF_SECURITY_ADMIN_USER: admin
+      GF_SECURITY_ADMIN_PASSWORD: admin
+    volumes:
+      # Dashboard JSON lives on disk and is auto-loaded at boot.
+      - ./infra/grafana/dashboards:/var/lib/grafana/dashboards:ro
+      - ./infra/grafana/provisioning:/etc/grafana/provisioning:ro
+    depends_on:
+      - prometheus
+
+# ── Named volumes ────────────────────────────────────────────────────
+volumes:
+  pgdata:

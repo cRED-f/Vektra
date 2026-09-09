@@ -1,0 +1,80 @@
+# ── Database: Deployment + Service + persistent storage ───────────────
+# Stateful apps need data that OUTLIVES pod restarts → a PersistentVolumeClaim
+# (PVC) gives storage that stays even if the pod is recreated.
+# (Production uses a StatefulSet/operator for Postgres; a Deployment + PVC
+#  is fine for a single-node learning cluster.)
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: vektra-db-init
+data:
+  # Runs once on first boot (docker-entrypoint-initdb.d) — enables pgvector.
+  init.sql: |
+    CREATE EXTENSION IF NOT EXISTS vector;
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: vektra-db-pvc
+spec:
+  accessModes:
+    - ReadWriteOnce         # one pod (the db) may write
+  resources:
+    requests:
+      storage: 1Gi
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: vektra-db
+  labels:
+    app: vektra-db
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: vektra-db
+  template:
+    metadata:
+      labels:
+        app: vektra-db
+    spec:
+      containers:
+        - name: db
+          image: pgvector/pgvector:pg16
+          ports:
+            - containerPort: 5432
+          env:
+            - name: POSTGRES_USER
+              value: vektra
+            - name: POSTGRES_PASSWORD
+              value: vektra
+            - name: POSTGRES_DB
+              value: vektra
+          volumeMounts:
+            - name: pgdata
+              mountPath: /var/lib/postgresql/data
+            - name: db-init
+              mountPath: /docker-entrypoint-initdb.d
+      volumes:
+        - name: pgdata
+          persistentVolumeClaim:
+            claimName: vektra-db-pvc
+        - name: db-init
+          configMap:
+            name: vektra-db-init
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: vektra-db
+  labels:
+    app: vektra-db
+spec:
+  selector:
+    app: vektra-db
+  ports:
+    - port: 5432
+      targetPort: 5432
+  type: ClusterIP

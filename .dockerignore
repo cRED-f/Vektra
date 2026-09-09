@@ -1,0 +1,45 @@
+# ── Docker build context excludes ─────────────────────────────────────
+# Anything listed here is NOT sent to the Docker daemon during builds.
+# Without this, Docker uploads the whole repo (node_modules, .next, .git
+# can be gigabytes) on every build — slow and wasteful.
+
+# dependencies
+node_modules/
+.next/
+out/
+
+# python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+dist/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+# git & tooling
+.git/
+.gitignore
+.claude/
+plans/
+.vscode/
+.idea/
+
+# env & secrets (never ship these into an image build)
+.env
+.env.*
+!.env.example
+
+# logs & temp
+*.log
+npm-debug.log*
+.DS_Store
+*.tsbuildinfo
+
+# tests moved locally are fine, but don't ship test caches
+coverage/
+.pytest_cache/
+
+# docker internals
+docker-compose.override.yml

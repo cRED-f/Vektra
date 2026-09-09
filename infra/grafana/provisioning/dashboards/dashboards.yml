@@ -1,0 +1,17 @@
+# ── Grafana dashboard provider ────────────────────────────────────────
+# Tells Grafana: "this folder contains dashboard JSON files; load them and
+# keep watching for changes." Dashboards are mounted into the container via
+# a volume (see docker-compose.yml).
+
+apiVersion: 1
+
+providers:
+  - name: Vektra
+    orgId: 1
+    folder: "Vektra"
+    type: file                                    # load dashboards from the filesystem
+    disableDeletion: false
+    updateIntervalSeconds: 10                     # re-check the folder every 10s
+    allowUiUpdates: false
+    options:
+      path: /var/lib/grafana/dashboards           # where we mount our JSON files

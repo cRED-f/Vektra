@@ -1,0 +1,19 @@
+# ── Service: give a Deployment a stable address ───────────────────────
+# Pods get recreated on restart and get NEW IPs each time. A Service gives
+# the Deployment a single, stable name + IP that other things can connect to.
+# It load-balances across the 2 backend pods.
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: vektra-backend
+  labels:
+    app: vektra-backend
+
+spec:
+  selector:
+    app: vektra-backend     # which pods (by label) this Service routes to
+  ports:
+    - port: 8000            # port the Service listens on (inside the cluster)
+      targetPort: 8000      # port the pod's container actually listens on
+  type: ClusterIP           # cluster-internal address only (default)

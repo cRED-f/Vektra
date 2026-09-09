@@ -1,4 +1,8 @@
-"""Entry point — run the Vektra API server."""
+"""Entry point — run the Vektra API server.
+
+uvicorn imports `app` from this module (e.g. `uvicorn server.main:app`),
+so it must be a module-level object rather than created inside main().
+"""
 
 from __future__ import annotations
 
@@ -7,13 +11,15 @@ import uvicorn
 from server.api.app import create_app
 from server.core.config import get_settings
 
+# Module-level app object — imported by uvicorn/gunicorn as `server.main:app`.
+app = create_app()
+
 
 def main():
     settings = get_settings()
-    app = create_app()
     uvicorn.run(
-        app,
-        host="0.0.0.0",
+        "server.main:app",
+        host=settings.gateway_host,
         port=settings.gateway_port,
         reload=settings.debug,
     )

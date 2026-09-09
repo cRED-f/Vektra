@@ -1,0 +1,21 @@
+# ── Prometheus scrape config ──────────────────────────────────────────
+# Prometheus is a SCRAPER: on an interval, it performs HTTP GETs ("scrapes")
+# against metric endpoints and stores the numbers as time-series.
+
+global:
+  # How often Prometheus scrapes by default.
+  scrape_interval: 5s
+
+scrape_configs:
+  # One "job" per thing we monitor. Each has a list of scrape targets.
+  - job_name: vektra-backend
+    metrics_path: /metrics
+    # "backend" is the docker-compose SERVICE NAME of our API container.
+    # Prometheus runs in the same compose network, so it resolves "backend".
+    static_configs:
+      - targets: ["backend:8000"]
+
+  # Scrape Prometheus itself (useful for debugging the setup).
+  - job_name: prometheus
+    static_configs:
+      - targets: ["localhost:9090"]
