@@ -40,6 +40,9 @@ yarn-error.log*
 # plans (internal docs, not shipped)
 plans/
 
+# design (duplicate of tracked DESIGN.md, kept local only)
+/design.md
+
 # vercel
 .vercel
 
