@@ -48,9 +48,11 @@ class BM25Index:
             enumerate(scores), key=lambda x: x[1], reverse=True
         )[:top_k]
 
+        # Return full documents so fusion produces complete candidates that
+        # rerank() can read .['text'] from, even for chunks only BM25 found.
         return [
             {
-                "chunk_id": self._chunk_ids[idx],
+                **self._documents[idx],
                 "bm25_score": float(score),
             }
             for idx, score in ranked

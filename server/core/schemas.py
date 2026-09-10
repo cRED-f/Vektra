@@ -97,6 +97,13 @@ class RetrievalResult(BaseModel):
 # ── Chat / Generation ────────────────────────────────────────────────
 
 
+class ChatMessage(BaseModel):
+    """A single message in conversation history."""
+
+    role: str = Field(description="'user' or 'assistant'")
+    content: str = Field(min_length=1, max_length=4000)
+
+
 class ChatRequest(BaseModel):
     """Chat request — retrieve + generate."""
 
@@ -106,6 +113,7 @@ class ChatRequest(BaseModel):
     model: str | None = Field(default=None, description="Override generation model")
     temperature: float = Field(default=0.7, ge=0.0, le=2.0)
     max_tokens: int = Field(default=1024, ge=1, le=8192)
+    history: list[ChatMessage] = Field(default_factory=list, description="Prior conversation turns")
 
 
 class ChatDelta(BaseModel):

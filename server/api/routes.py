@@ -1,15 +1,18 @@
-"""FastAPI route handlers — /retrieve, /chat, /benchmark, /models, /health, /metrics."""
+"""FastAPI route handlers — /retrieve, /chat, /ingest, /benchmark, /models, /health, /metrics."""
 
 from __future__ import annotations
 
 import asyncio
+import os
+import tempfile
+from pathlib import Path
 
-from fastapi import APIRouter, Depends, HTTPException, Request
+from fastapi import APIRouter, Depends, HTTPException, Request, UploadFile, File
 from fastapi.responses import JSONResponse, Response, StreamingResponse
 from prometheus_client import generate_latest
-from sqlalchemy import text
+from sqlalchemy import text, select, delete as sa_delete
 
-from server.core.db import get_engine
+from server.core.db import get_engine, DocumentRow, ChunkRow, get_session_factory
 
 from server.api.auth import verify_token
 from server.api.circuit_breaker import get_circuit_breaker
@@ -23,6 +26,7 @@ from server.core.logging import get_logger
 from server.core.schemas import (
     BenchmarkRequest,
     BenchmarkResult,
+    ChatMessage,
     ChatRequest,
     ChatResponse,
     HealthResponse,
@@ -36,6 +40,19 @@ from server.serve.server import ModelServer
 logger = get_logger("api.routes")
 
 router = APIRouter()
+
+SYSTEM_PROMPT = """You are Vektra, a knowledgeable and helpful AI assistant specialized in answering questions based on provided documentation and context.
+
+Rules:
+- Answer ONLY based on the provided context. If the context does not contain enough information, say so clearly.
+- Be concise and direct. Use bullet points for multiple items.
+- When listing features, steps, or options, use numbered or bulleted lists.
+- If the user asks about something not in the context, respond: "I don't have that information in my current knowledge base. Please upload relevant documents or rephrase your question."
+- Never fabricate information. Only state what is supported by the context.
+- For technical questions, include specific details from the context (file names, function names, config values).
+- Maintain a professional but friendly tone.
+- When the user uploads files, confirm the upload and summarize what was ingested.
+"""
 
 
 # ── Dependencies ───────────────────────────────────────────────────────
@@ -166,7 +183,10 @@ async def chat(
     request: Request,
     _token: str = Depends(verify_token),
 ):
-    """RAG chat: retrieve → build prompt → generate (streaming or non-streaming)."""
+    """RAG chat: retrieve → build prompt → generate (streaming or non-streaming).
+
+    Supports conversation history for multi-turn dialogue.
+    """
     _check_rate_limit(request)
 
     cb = get_circuit_breaker("serve")
@@ -184,13 +204,25 @@ async def chat(
             use_reranker=True,
         )
 
-        # Build RAG prompt
+        # Build RAG prompt with conversation history
         context = "\n\n---\n\n".join(r.text for r in results)
+
+        # Build full prompt: system + history + current query
+        history_lines: list[str] = []
+        for msg in body.history[-10:]:  # Keep last 10 turns for context window
+            prefix = "User" if msg.role == "user" else "Assistant"
+            history_lines.append(f"{prefix}: {msg.content}")
+
+        history_block = "\n".join(history_lines) if history_lines else "(no prior messages)"
+
         prompt = (
-            f"Answer the user's question based on the following context.\n\n"
-            f"Context:\n{context}\n\n"
-            f"Question: {body.query}\n\n"
-            f"Answer:"
+            f"{SYSTEM_PROMPT}\n\n"
+            f"--- RETRIEVED CONTEXT ---\n"
+            f"{context}\n"
+            f"--- END CONTEXT ---\n\n"
+            f"Conversation history:\n{history_block}\n\n"
+            f"User: {body.query}\n\n"
+            f"Assistant:"
         )
 
         if body.stream:
@@ -233,6 +265,108 @@ async def chat(
         raise HTTPException(status_code=500, detail=f"chat failed: {e}")
     finally:
         await retriever.close()
+
+
+# ── Ingest ────────────────────────────────────────────────────────────
+
+@router.post("/ingest", dependencies=[Depends(verify_token)])
+async def ingest_file(
+    request: Request,
+    _token: str = Depends(verify_token),
+    file: UploadFile | None = File(default=None),
+):
+    """Ingest an uploaded file into the vector store.
+
+    Multipart field "file" holds the bytes. The filename's extension selects
+    the extractor (pdf/docx/md/html/txt...). The extracted text is chunked,
+    embedded, and inserted — so retrieval can actually find it.
+    """
+    _check_rate_limit(request)
+
+    if file is None:
+        # Fallback for the old JSON senders: accept {filename, text}.
+        try:
+            body = await request.json()
+        except Exception:
+            body = {}
+        text_content = body.get("text", "")
+        filename = body.get("filename", "unknown")
+        extension = ".md"
+    else:
+        data = await file.read()
+        if not data:
+            raise HTTPException(status_code=400, detail="empty upload")
+        filename = file.filename or "upload"
+        # Preserve the extension so the extractor picks the right parser.
+        extension = Path(filename).suffix.lower() or ".md"
+        # Raw bytes → write to a temp file with the same extension.
+        text_content = data  # written below
+
+    try:
+        from server.ingest import run as run_ingest
+
+        # Stage the upload in a temp dir under its ORIGINAL name so the stored
+        # document filename is the user's file name (not a random tmpXXXX) and
+        # the extension matches the original for the correct extractor.
+        safe_name = Path(filename).name or f"upload{extension}"
+        tmp_dir = tempfile.mkdtemp(prefix="vektra-ingest-")
+        tmp_path = os.path.join(tmp_dir, safe_name)
+        try:
+            with open(tmp_path, "wb" if isinstance(text_content, bytes) else "w") as f:
+                f.write(text_content)
+            report = await run_ingest(
+                [tmp_path],
+                chunk_strategy="recursive",
+                chunk_size=512,
+                chunk_overlap=64,
+            )
+        finally:
+            import shutil
+
+            shutil.rmtree(tmp_dir, ignore_errors=True)
+
+        if report.errors:
+            logger.warning("ingest completed with errors: %s", report.errors)
+
+        return {
+            "status": "ok",
+            "filename": filename,
+            "chunks_created": report.chunks_created,
+            "documents_processed": report.documents_processed,
+            "errors": report.errors,
+        }
+
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error("ingest failed: %s", e)
+        raise HTTPException(status_code=500, detail=f"ingestion failed: {e}")
+
+
+@router.delete("/ingest/{document_id}", dependencies=[Depends(verify_token)])
+async def delete_document(
+    document_id: str,
+    _token: str = Depends(verify_token),
+):
+    """Delete a document and all its chunks from the vector store."""
+    try:
+        factory = get_session_factory()
+        async with factory() as session:
+            # Delete chunks first
+            await session.execute(
+                sa_delete(ChunkRow).where(ChunkRow.document_id == document_id)
+            )
+            # Delete document
+            await session.execute(
+                sa_delete(DocumentRow).where(DocumentRow.id == document_id)
+            )
+            await session.commit()
+
+        return {"status": "deleted", "document_id": document_id}
+
+    except Exception as e:
+        logger.error("delete failed: %s", e)
+        raise HTTPException(status_code=500, detail=f"delete failed: {e}")
 
 
 @router.post("/benchmark", dependencies=[Depends(verify_token)])
