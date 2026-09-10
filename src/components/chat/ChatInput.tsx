@@ -6,6 +6,7 @@ interface ChatInputProps {
   value: string;
   onChange: (val: string) => void;
   onSubmit: (e?: React.FormEvent) => void;
+  onFileSelect?: () => void;
   isLoading: boolean;
 }
 
@@ -13,6 +14,7 @@ export default function ChatInput({
   value,
   onChange,
   onSubmit,
+  onFileSelect,
   isLoading,
 }: ChatInputProps) {
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -33,13 +35,21 @@ export default function ChatInput({
 
   return (
     <form onSubmit={onSubmit} className="chat-input-form">
-      {/* Optional: attachment icon */}
-      <button type="button" className="chat-input-icon" tabIndex={-1}>
+      {/* Attachment icon — a <label> for the hidden file input.
+          Native behavior: clicking a <label htmlFor=...> opens the file
+          picker in every browser, with zero JavaScript. The onClick remains
+          as a safety fallback only. */}
+      <label
+        htmlFor="vektra-file-input"
+        className="chat-input-icon"
+        title="Upload a file"
+        onClick={onFileSelect}
+      >
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none"
           stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
         </svg>
-      </button>
+      </label>
 
       <textarea
         ref={textareaRef}
