@@ -369,9 +369,3 @@ python scripts/loadtest.py --url http://localhost:18000 --requests 200
 - [ ] Unit + integration test suite wired into CI
 
 ---
-
-## 📄 License & Credits
-
-ME — you decide. (Add your license here before publishing.) Stack: [FastAPI](https://fastapi.tiangolo.com), [Next.js](https://nextjs.org), [pgvector](https://github.com/pgvector/pgvector), [Ollama](https://ollama.com), [Prometheus](https://prometheus.io), [Grafana](https://grafana.com).
-
-Built for **free, open-source RAG on measured latency** — no paid inference.
